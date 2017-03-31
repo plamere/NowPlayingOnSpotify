@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link href="https://sp-bootstrap.global.ssl.fastly.net/7.4.1/sp-bootstrap.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="images/favicon.png">
+    <title> Your Play History</title>
+</head>
+  <body >
+    <div id="navbar" class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="index.html">
+            <span class="navbar-logo">Spotify</span>
+            <span class="navbar-title">Now Playing on Spotify</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <!-- Main jumbotron for a primary marketing message or call to action -->
+      <div id='main' class="jumbotron jumbotron-hero container-fluid">
+          <div class='intro'> 
+              <div  class="container" id="jumbo-dialog">
+                <h1 class='ttext'>Now Playing On Spotify</h1>
+                <p class='ttext'>
+                    A demo of the new currently-playing Spotify API
+                </p>
+                <br>
+                <a class="btn btn-primary btn-lg go" id='go' role="button">Login with Spotify to get started</a>
+              </div>
+          </div>
+      </div>
+      <div id="work" class="work" style="display:none"> 
+        <img id='now-playing-cover-art' style="margin: 0px 20px 0px 20px;" class='pull-left' width="300px" src="">
+        <h2 id='now-playing-song-name'> </h2>
+        <h3 id='now-playing-artist-name'> </h3>
+        <div> Play time: <span id='now-playing-progress'> </span> </div>
+        <div> Remaining: <span id='now-playing-remains'> </span> </div>
+        <div> <a id='now-playing-context' href=''> context </a> </div>
+        <div> State: <span id='now-playing-playing'> </span> </div>
+        <div id="info"> </div>
+      </div>
+       <br>
+    </div>
+    <div id='footer'>
+      Created by <a href='http://twitter.com/plamere'>@plamere </a>
+    </div>
+    <script src="lib/jquery-1.11.1.min.js"></script>
+    <script src="https://sp-bootstrap.global.ssl.fastly.net/7.4.1/sp-bootstrap.min.js"></script>
+    <script src="lib/underscore-min.js"></script>
+    <script src="config.js?v1"></script>
+<script>
+"use strict";
+var accessToken = null;
+
+function error(msg) {
+    info(msg);
+}
+
+function info(msg) {
+    $("#info").text(msg);
+}
+
+function authorizeUser() {
+    var scopes = 'user-read-recently-played user-read-currently-playing user-read-playback-state';
+    var url = 'https://accounts.spotify.com/authorize?client_id=' + SPOTIFY_CLIENT_ID +
+        '&response_type=token' +
+        '&show_dialog=false' +
+        '&scope=' + encodeURIComponent(scopes) +
+        '&redirect_uri=' + encodeURIComponent(SPOTIFY_REDIRECT_URI);
+    document.location = url;
+}
+
+function parseArgs() {
+    var hash = location.hash.replace(/#/g, '');
+    var all = hash.split('&');
+    var args = {};
+    _.each(all, function(keyvalue) {
+        var kv = keyvalue.split('=');
+        var key = kv[0];
+        var val = kv[1];
+        args[key] = val;
+    });
+    return args;
+}
+
+function callSpotify(type, url, json, callback) {
+    $.ajax(url, {
+        type: type,
+        //data: JSON.stringify(json),
+        //dataType: 'json',
+        headers: {
+            'Authorization': 'Bearer ' + accessToken,
+            'Content-Type': 'application/json'
+        },
+        success: function(r) {
+            callback(true, r);
+        },
+        error: function(r) {
+            // 2XX status codes are good, but some have no
+            // response data which triggers the error handler
+            // convert it to goodness.
+            if (r.status >= 200 && r.status < 300) {
+                callback(true, r);
+            } else {
+                callback(false, r);
+            }
+        }
+    });
+}
+
+function fetchNowPlaying(callback) {
+    var url = 'https://api.spotify.com/v1/me/player/currently-playing';
+    callSpotify("GET", url, null, callback);
+}
+
+function isLocalHost() {
+    return window.location.host.indexOf('localhost') >= 0;
+}
+
+function go() {
+    $('.err-txt').text("");
+    authorizeUser();
+}
+
+function refreshNowPlaying() {
+    fetchNowPlaying(function(status, data) {
+        console.log("now playing", data);
+        var time_delta = now() - (data.timestamp + data.progress_ms);
+        if (data.item.album.images.length > 0) {
+            $("#now-playing-cover-art").attr('src', data.item.album.images[0].url);
+        }
+        var progress = Math.round(data.progress_ms / 1000);
+        var sprogress = fmtTime(progress);
+        var remains = Math.round(data.item.duration_ms / 1000) - progress;
+        var sremains = fmtTime(remains);
+
+        $("#now-playing-song-name").text(data.item.name);
+        $("#now-playing-artist-name").text(data.item.artists[0].name);
+        $("#now-playing-progress").text(sprogress);
+        $("#now-playing-remains").text(sremains);
+        $("#now-playing-context").text( data.context.type + " context");
+        $("#now-playing-context").attr("href", data.context.uri);
+        $("#now-playing-playing").text( data.is_playing ? "playing" : "paused");
+        setTimeout(refreshNowPlaying, 1000);
+    });
+}
+
+function now() {
+    var d = new Date();
+    return d.getTime()
+}
+
+function fmtTime(time) {
+    var mins = Math.floor(time / 60);
+    time -= mins * 60;
+    var timeString = pad(mins) + ":" + pad(Math.floor(time));
+    return timeString;
+}
+
+function pad(num) {
+    return ("00" + num).substr(-2,2);
+}
+
+$(document).ready(
+    function() {
+        if (isLocalHost()) {
+            SPOTIFY_REDIRECT_URI = LOCAL_SPOTIFY_REDIRECT_URI;
+        }
+        var args = parseArgs();
+        window.location.hash = "";
+
+        $(".work").hide();
+        if ('error' in args) {
+            error("Sorry, I can't read your play history Spotify without authorization");
+            $("#go").show();
+            $("#go").on('click', function() {
+                go();
+            });
+        } else if ('access_token' in args) {
+            $("#refresh-now-playing").on("click", function() {
+                refreshNowPlaying();
+            });
+
+            $(".work").show();
+            $(".intro").hide();
+            accessToken = args['access_token'];
+            refreshNowPlaying();
+        } else {
+            $("#go").show();
+            $("#go").on('click', function() {
+                go();
+            });
+        }
+    }
+);
+
+</script>
+</body>
+</html>
