@@ -9,6 +9,13 @@
     <link href="https://sp-bootstrap.global.ssl.fastly.net/7.4.1/sp-bootstrap.min.css" rel="stylesheet">
     <link rel="shortcut icon" href="images/favicon.png">
     <title> Your Play History</title>
+
+    <style>
+        body {
+            margin-left:20px;
+            margin-right:20px;
+        }
+    </style>
 </head>
   <body >
     <div id="navbar" class="navbar navbar-default navbar-fixed-top" role="navigation">
@@ -42,12 +49,121 @@
         <div> Remaining: <span id='now-playing-remains'> </span> </div>
         <div> <a id='now-playing-context' href=''> context </a> </div>
         <div> State: <span id='now-playing-playing'> </span> </div>
+        <div> <a id="next"> next </a>
         <div id="info"> </div>
       </div>
+       <div>
+        <div> <br clear="all"> </div>
+        <h2> Your Devices </h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> Name </th>
+                <th> Type </th>
+                <th> Active </th>
+                <th> Restricted </th>
+                <th> Volume </th>
+            </thead>
+            <tbody id="devices">
+            </tbody>
+        </table>
+        <div> <br clear="all"> </div>
+        <h2> Your Play History </h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> Artist </th>
+                <th> Duration </th>
+                <th> Context </th>
+                <th> Play time </th>
+            </thead>
+            <tbody id="history">
+            </tbody>
+        </table>
+
+        <h2> Your Short Term Top Artists</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="short-term-top-artists">
+            </tbody>
+        </table>
+
+        <h2> Your Medium Term Top Artists</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="medium-term-top-artists">
+            </tbody>
+        </table>
+
+        <h2> Your Long Term Top Artists</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="long-term-top-artists">
+            </tbody>
+        </table>
+
+        <h2> Your Short Term Top Tracks</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> Artist </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="short-term-top-tracks">
+            </tbody>
+        </table>
+
+        <h2> Your Medium Term Top Tracks</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> Artist </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="medium-term-top-tracks">
+            </tbody>
+        </table>
+
+        <h2> Your Long Term Top Tracks</h2>
+        <table class=table>
+            <thead>
+                <tr>
+                <th> # </th>
+                <th> Name </th>
+                <th> Artist </th>
+                <th> popularity </th>
+            </thead>
+            <tbody id="long-term-top-tracks">
+            </tbody>
+        </table>
+
+       </div>
+
        <br>
     </div>
     <div id='footer'>
-      Created by <a href='http://twitter.com/plamere'>@plamere </a>
+      Created by <a href='http://twitter.com/plamere'>@plamere </a> Get the <a href="https://github.com/plamere/NowPlayingOnSpotify"> source </a>.
     </div>
     <script src="lib/jquery-1.11.1.min.js"></script>
     <script src="https://sp-bootstrap.global.ssl.fastly.net/7.4.1/sp-bootstrap.min.js"></script>
@@ -66,7 +182,7 @@ function info(msg) {
 }
 
 function authorizeUser() {
-    var scopes = 'user-read-recently-played user-read-currently-playing user-read-playback-state';
+    var scopes = 'user-top-read user-read-recently-played user-read-currently-playing user-read-playback-state user-modify-playback-state';
     var url = 'https://accounts.spotify.com/authorize?client_id=' + SPOTIFY_CLIENT_ID +
         '&response_type=token' +
         '&show_dialog=false' +
@@ -118,6 +234,36 @@ function fetchNowPlaying(callback) {
     callSpotify("GET", url, null, callback);
 }
 
+function fetchPlayHistory(callback) {
+    var url = 'https://api.spotify.com/v1/me/player/recently-played?limit=50'
+    var items = [];
+    function fetcher(url) {
+        console.log('fetcher', url);
+        callSpotify("GET", url, null, function(status, data) {
+            if (status) {
+                _.each(data.items, function(item) {
+                    items.push(item);
+                });
+                if (data.next) {
+                    fetcher(data.next);
+                } else {
+                    console.log("cb with", items.length, 'items', items);
+                    callback(status, items);
+                }
+            } else {
+                callback(false, items);
+            }
+        });
+    }
+
+    fetcher(url);
+}
+
+function playNext(callback) {
+    var url = 'https://api.spotify.com/v1/me/player/next';
+    callSpotify("Post", url, null, callback);
+}
+
 function isLocalHost() {
     return window.location.host.indexOf('localhost') >= 0;
 }
@@ -139,14 +285,17 @@ function refreshNowPlaying() {
         var remains = Math.round(data.item.duration_ms / 1000) - progress;
         var sremains = fmtTime(remains);
 
+        var ctx = data.context ? data.context.type + " context" : "";
+        var uri = data.context ? data.context.uri :  " ";
+
         $("#now-playing-song-name").text(data.item.name);
         $("#now-playing-artist-name").text(data.item.artists[0].name);
         $("#now-playing-progress").text(sprogress);
         $("#now-playing-remains").text(sremains);
-        $("#now-playing-context").text( data.context.type + " context");
-        $("#now-playing-context").attr("href", data.context.uri);
+        $("#now-playing-context").text( ctx);
+        $("#now-playing-context").attr("href", uri);
         $("#now-playing-playing").text( data.is_playing ? "playing" : "paused");
-        setTimeout(refreshNowPlaying, 1000);
+        // setTimeout(refreshNowPlaying, 1000);
     });
 }
 
@@ -165,6 +314,82 @@ function fmtTime(time) {
 function pad(num) {
     return ("00" + num).substr(-2,2);
 }
+
+function refreshDevices() {
+    var url = 'https://api.spotify.com/v1/me/player/devices';
+    console.log('refresh devices');
+    callSpotify("GET", url, null, function(status, data) {
+        var tbl = $("#devices");
+        tbl.empty();
+        console.log('refresh devices', data);
+        _.each(data.devices, function(device) {
+            var tr = $("<tr>");
+            tr.append($("<td>").text(device.name));
+            tr.append($("<td>").text(device.type));
+            tr.append($("<td>").text(device.is_active));
+            tr.append($("<td>").text(device.is_restricted));
+            tr.append($("<td>").text(device.volume_percent));
+            tbl.append(tr);
+        });
+    });
+}
+
+function refreshPlayHistory() {
+    fetchPlayHistory(function(status, items) {
+        console.log('fph', status, items);
+        var tbl = $("#history");
+        _.each(items, function(item, i) {
+            var track = item.track;
+            var tr = $("<tr>");
+            var ctx_uri = "";
+            if (item.context) {
+                ctx_uri = $("<a>").text(item.context.type).attr("href", item.context.uri);
+            }
+            tr.append($("<td>").text(i + 1));
+            tr.append($("<td>").text(track.name));
+            tr.append($("<td>").text(track.artists[0].name));
+            tr.append($("<td>").text(fmtTime(track.duration_ms / 1000.)));
+            tr.append($("<td>").append(ctx_uri));
+            tr.append($("<td>").text(item.played_at));
+            tbl.append(tr);
+        });
+    });
+}
+
+
+function fetchTopItems(type, time, callback) {
+    var url = 'https://api.spotify.com/v1/me/top/' + type + "?limit=50&time_range=" + time;
+    callSpotify("GET", url, null, callback);
+}
+
+function refreshTopArtists(time, tbl) {
+    fetchTopItems("artists", time, function(status, data) {
+        tbl.empty();
+        _.each(data.items, function(item, i) {
+            var track = item.track;
+            var tr = $("<tr>");
+            tr.append($("<td>").text(i + 1));
+            tr.append($("<td>").text(item.name));
+            tr.append($("<td>").text(item.popularity));
+            tbl.append(tr);
+        });
+    });
+}
+
+function refreshTopTracks(time, tbl) {
+    fetchTopItems("tracks", time, function(status, data) {
+        _.each(data.items, function(item, i) {
+            var track = item.track;
+            var tr = $("<tr>");
+            tr.append($("<td>").text(i + 1));
+            tr.append($("<td>").text(item.name));
+            tr.append($("<td>").text(item.artists[0].name));
+            tr.append($("<td>").text(item.popularity));
+            tbl.append(tr);
+        });
+    });
+}
+
 
 $(document).ready(
     function() {
@@ -186,10 +411,24 @@ $(document).ready(
                 refreshNowPlaying();
             });
 
+            $("#next").on("click", function() {
+                playNext( function() {
+                });
+            });
+
             $(".work").show();
             $(".intro").hide();
             accessToken = args['access_token'];
             refreshNowPlaying();
+            refreshDevices();
+            refreshPlayHistory();
+            refreshTopArtists('short_term', $("#short-term-top-artists"));
+            refreshTopArtists('medium_term', $("#medium-term-top-artists"));
+            refreshTopArtists('long_term', $("#long-term-top-artists"));
+
+            refreshTopTracks('short_term', $("#short-term-top-tracks"));
+            refreshTopTracks('medium_term', $("#medium-term-top-tracks"));
+            refreshTopTracks('long_term', $("#long-term-top-tracks"));
         } else {
             $("#go").show();
             $("#go").on('click', function() {
