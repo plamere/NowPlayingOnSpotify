@@ -34,7 +34,8 @@
               <div  class="container" id="jumbo-dialog">
                 <h1 class='ttext'>Now Playing On Spotify</h1>
                 <p class='ttext'>
-                    A demo of the new currently-playing Spotify API
+                    A demo of all the information that the Spotify API can provide about your recent
+                    listening.
                 </p>
                 <br>
                 <a class="btn btn-primary btn-lg go" id='go' role="button">Login with Spotify to get started</a>
@@ -42,6 +43,7 @@
           </div>
       </div>
       <div id="work" class="work" style="display:none"> 
+        <h1> Now playing on Spotify</h1>
         <img id='now-playing-cover-art' style="margin: 0px 20px 0px 20px;" class='pull-left' width="300px" src="">
         <h2 id='now-playing-song-name'> </h2>
         <h3 id='now-playing-artist-name'> </h3>
@@ -54,7 +56,9 @@
       </div>
        <div>
         <div> <br clear="all"> </div>
+       <hr>
         <h2> Your Devices </h2>
+        <p> The devices Where you listen to your music. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -68,7 +72,9 @@
             </tbody>
         </table>
         <div> <br clear="all"> </div>
+        <hr>
         <h2> Your Play History </h2>
+        <p> These are the tracks you've most recently played on Spotify.
         <table class=table>
             <thead>
                 <tr>
@@ -83,7 +89,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Short Term Top Artists</h2>
+        <p> Your top artists from the last month. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -95,7 +103,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Medium Term Top Artists</h2>
+        <p> Your top artists from the last six months. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -107,7 +117,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Long Term Top Artists</h2>
+        <p> Your top artists from the last several years. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -119,7 +131,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Short Term Top Tracks</h2>
+        <p> Your top tracks from the last month. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -132,7 +146,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Medium Term Top Tracks</h2>
+        <p> Your top tracks from the last six months. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -145,7 +161,9 @@
             </tbody>
         </table>
 
+        <hr>
         <h2> Your Long Term Top Tracks</h2>
+        <p> Your top tracks from the last several years. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -295,7 +313,7 @@ function refreshNowPlaying() {
         $("#now-playing-context").text( ctx);
         $("#now-playing-context").attr("href", uri);
         $("#now-playing-playing").text( data.is_playing ? "playing" : "paused");
-        // setTimeout(refreshNowPlaying, 1000);
+        setTimeout(refreshNowPlaying, 1000);
     });
 }
 
