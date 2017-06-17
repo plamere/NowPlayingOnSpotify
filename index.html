@@ -15,6 +15,9 @@
             margin-left:20px;
             margin-right:20px;
         }
+        td a, .controls {
+            cursor:pointer
+        }
     </style>
 </head>
   <body >
@@ -51,14 +54,18 @@
         <div> Remaining: <span id='now-playing-remains'> </span> </div>
         <div> <a id='now-playing-context' href=''> context </a> </div>
         <div> State: <span id='now-playing-playing'> </span> </div>
-        <div> <a id="next"> next </a>
-        <div id="info"> </div>
-      </div>
+        <div> 
+            <a class='controls next' id="next"> next </a>
+            <a class='controls pause' id="pause"> pause </a>
+            <a class='controls play' id="play"> play </a>
+            <div id="info"> </div>
+       </div>
+
        <div>
         <div> <br clear="all"> </div>
        <hr>
-        <h2> Your Devices </h2>
-        <p> The devices that you listen to your music on. </p>
+        <h2> Your Recent Devices </h2>
+        <p> The devices that you've recently listened to your music on. </p>
         <table class=table>
             <thead>
                 <tr>
@@ -223,10 +230,8 @@ function parseArgs() {
 }
 
 function callSpotify(type, url, json, callback) {
-    $.ajax(url, {
+    var payload = {
         type: type,
-        //data: JSON.stringify(json),
-        //dataType: 'json',
         headers: {
             'Authorization': 'Bearer ' + accessToken,
             'Content-Type': 'application/json'
@@ -244,7 +249,14 @@ function callSpotify(type, url, json, callback) {
                 callback(false, r);
             }
         }
-    });
+    };
+
+    if (json != null) {
+        payload.data = JSON.stringify(json);
+        payload.dataType = 'json';
+    }
+
+    $.ajax(url, payload);
 }
 
 function fetchNowPlaying(callback) {
@@ -256,7 +268,6 @@ function fetchPlayHistory(callback) {
     var url = 'https://api.spotify.com/v1/me/player/recently-played?limit=50'
     var items = [];
     function fetcher(url) {
-        console.log('fetcher', url);
         callSpotify("GET", url, null, function(status, data) {
             if (status) {
                 _.each(data.items, function(item) {
@@ -265,7 +276,6 @@ function fetchPlayHistory(callback) {
                 if (data.next) {
                     fetcher(data.next);
                 } else {
-                    console.log("cb with", items.length, 'items', items);
                     callback(status, items);
                 }
             } else {
@@ -282,6 +292,31 @@ function playNext(callback) {
     callSpotify("Post", url, null, callback);
 }
 
+function playTrack(uri, callback) {
+    var url = 'https://api.spotify.com/v1/me/player/play';
+    callSpotify("PUT", url, {uris:[uri]}, callback);
+}
+
+function seek(position_ms) {
+    var url = 'https://api.spotify.com/v1/me/player/seek?position_ms=' + position_ms;
+    callSpotify("PUT", url, null, function(status, data) { });
+}
+
+function pause() {
+    var url = 'https://api.spotify.com/v1/me/player/pause';
+    callSpotify("PUT", url, null, function(status, data) { refreshNowPlaying(); });
+}
+
+function play() {
+    var url = 'https://api.spotify.com/v1/me/player/play';
+    callSpotify("PUT", url, null, function(status, data) { refreshNowPlaying(); });
+}
+
+function playArtist(uri, callback) {
+    var url = 'https://api.spotify.com/v1/me/player/play';
+    callSpotify("PUT", url, {context_uri:uri}, callback);
+}
+
 function isLocalHost() {
     return window.location.host.indexOf('localhost') >= 0;
 }
@@ -293,7 +328,6 @@ function go() {
 
 function refreshNowPlaying() {
     fetchNowPlaying(function(status, data) {
-        console.log("now playing", data);
         var time_delta = now() - (data.timestamp + data.progress_ms);
         if (data.item.album.images.length > 0) {
             $("#now-playing-cover-art").attr('src', data.item.album.images[0].url);
@@ -313,8 +347,25 @@ function refreshNowPlaying() {
         $("#now-playing-context").text( ctx);
         $("#now-playing-context").attr("href", uri);
         $("#now-playing-playing").text( data.is_playing ? "playing" : "paused");
-        setTimeout(refreshNowPlaying, 1000);
+
+        if (data.context) {
+            $(".next").show();
+        } else {
+            $(".next").hide();
+        }
+        if (data.is_playing) {
+            $(".play").hide();
+            $(".pause").show();
+        } else {
+            $(".play").show();
+            $(".pause").hide();
+        }
     });
+}
+
+function autoRefreshNowPlaying() {
+    refreshNowPlaying();
+    setTimeout(autoRefreshNowPlaying, 1000);
 }
 
 function now() {
@@ -335,11 +386,9 @@ function pad(num) {
 
 function refreshDevices() {
     var url = 'https://api.spotify.com/v1/me/player/devices';
-    console.log('refresh devices');
     callSpotify("GET", url, null, function(status, data) {
         var tbl = $("#devices");
         tbl.empty();
-        console.log('refresh devices', data);
         _.each(data.devices, function(device) {
             var tr = $("<tr>");
             tr.append($("<td>").text(device.name));
@@ -352,9 +401,28 @@ function refreshDevices() {
     });
 }
 
+function getTrackAnchor(track) {
+    var a = $("<a>").text(track.name);
+    a.on("click", function() {
+        playTrack(track.uri, function(data) {
+            refreshNowPlaying();
+        });
+    });
+    return a;
+}
+
+function getArtistAnchor(name, uri) {
+    var a = $("<a>").text(name);
+    a.on("click", function() {
+        playArtist(uri, function(data) {
+            refreshNowPlaying();
+        });
+    });
+    return a;
+}
+
 function refreshPlayHistory() {
     fetchPlayHistory(function(status, items) {
-        console.log('fph', status, items);
         var tbl = $("#history");
         _.each(items, function(item, i) {
             var track = item.track;
@@ -363,12 +431,14 @@ function refreshPlayHistory() {
             if (item.context) {
                 ctx_uri = $("<a>").text(item.context.type).attr("href", item.context.uri);
             }
+
             tr.append($("<td>").text(i + 1));
-            tr.append($("<td>").text(track.name));
-            tr.append($("<td>").text(track.artists[0].name));
+            tr.append($("<td>").append(getTrackAnchor(track)));
+            tr.append($("<td>").append(getArtistAnchor(track.artists[0].name, track.artists[0].uri)));
             tr.append($("<td>").text(fmtTime(track.duration_ms / 1000.)));
             tr.append($("<td>").append(ctx_uri));
-            tr.append($("<td>").text(item.played_at));
+            tr.append($("<td>").text(new Date(Date.parse(item.played_at)).toLocaleString()));
+            //tr.append($("<td>").text(item.played_at));
             tbl.append(tr);
         });
     });
@@ -387,7 +457,7 @@ function refreshTopArtists(time, tbl) {
             var track = item.track;
             var tr = $("<tr>");
             tr.append($("<td>").text(i + 1));
-            tr.append($("<td>").text(item.name));
+            tr.append($("<td>").append(getArtistAnchor(item.name, item.uri)));
             tr.append($("<td>").text(item.popularity));
             tbl.append(tr);
         });
@@ -397,11 +467,11 @@ function refreshTopArtists(time, tbl) {
 function refreshTopTracks(time, tbl) {
     fetchTopItems("tracks", time, function(status, data) {
         _.each(data.items, function(item, i) {
-            var track = item.track;
+            var track = item;
             var tr = $("<tr>");
             tr.append($("<td>").text(i + 1));
-            tr.append($("<td>").text(item.name));
-            tr.append($("<td>").text(item.artists[0].name));
+            tr.append($("<td>").append(getTrackAnchor(track)));
+            tr.append($("<td>").append(getArtistAnchor(item.artists[0].name, item.artists[0].uri)));
             tr.append($("<td>").text(item.popularity));
             tbl.append(tr);
         });
@@ -434,10 +504,17 @@ $(document).ready(
                 });
             });
 
+            $("#pause").on("click", function() {
+                pause();
+            });
+
+            $("#play").on("click", function() {
+                play();
+            });
+
             $(".work").show();
             $(".intro").hide();
             accessToken = args['access_token'];
-            refreshNowPlaying();
             refreshDevices();
             refreshPlayHistory();
             refreshTopArtists('short_term', $("#short-term-top-artists"));
@@ -447,6 +524,7 @@ $(document).ready(
             refreshTopTracks('short_term', $("#short-term-top-tracks"));
             refreshTopTracks('medium_term', $("#medium-term-top-tracks"));
             refreshTopTracks('long_term', $("#long-term-top-tracks"));
+            autoRefreshNowPlaying();
         } else {
             $("#go").show();
             $("#go").on('click', function() {
